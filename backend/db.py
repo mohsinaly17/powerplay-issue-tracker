@@ -176,3 +176,44 @@ def delete_issue(conn, issue_id):
     via the ON DELETE CASCADE foreign key)."""
     conn.execute("DELETE FROM issues WHERE id = ?", (issue_id,))
     conn.commit()
+    def list_issues(conn, search=None, filters=None, sort_by="date_reported",
+                 order="desc", page=1, per_page=20):
+    """List issues with optional keyword search, field filters, sorting and
+    pagination - all in one function."""
+    filters = filters or {}
+    clauses, params = [], []
+
+    # --- search across multiple text fields ---
+    if search:
+        like = f"%{search}%"
+        clauses.append("(title LIKE ? OR description LIKE ? OR affected_system LIKE ? OR cve_id LIKE ?)")
+        params += [like, like, like, like]
+
+    # --- exact-match filters ---
+    for field in ("status", "severity", "issue_type", "priority", "assignee", "reporter"):
+        if filters.get(field):
+            clauses.append(f"{field} = ?")
+            params.append(filters[field])
+
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+    rows = conn.execute(f"SELECT * FROM issues {where}", params).fetchall()
+    items = [dict(r) for r in rows]
+
+    # --- sorting ---
+    if sort_by in ("severity", "priority"):
+        # severity/priority need a *logical* order (CRITICAL > HIGH > ...),
+        # not alphabetical, so we sort in Python using the rank tables
+        rank = SEVERITY_RANK if sort_by == "severity" else PRIORITY_RANK
+        items.sort(key=lambda i: rank.get(i[sort_by], -1), reverse=(order != "asc"))
+    else:
+        col = sort_by if sort_by in SORTABLE_COLUMNS else "date_reported"
+        items.sort(key=lambda i: (i[col] is None, i[col]), reverse=(order != "asc"))
+
+    # --- pagination ---
+    total = len(items)
+    start = (page - 1) * per_page
+    page_items = items[start:start + per_page]
+    for it in page_items:
+        it["tags"] = it["tags"].split(",") if it.get("tags") else []
+    return total, page_items
