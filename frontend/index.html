@@ -254,6 +254,7 @@ function fmtDate(iso) {
 
 function rowEl(it) {
   const tr = el('tr', {});
+tr.addEventListener('click', () => openDetail(it.id)); 
   tr.appendChild(el('td', {}, [
     el('div', {}, it.title),
     it.cve_id ? el('div', {class:'cve'}, it.cve_id) : el('span',{class:'muted'},''),
@@ -368,6 +369,58 @@ function openForm(existing) {
   modal.appendChild(row4); modal.appendChild(row5);
   modal.appendChild(errBox);
   modal.appendChild(actions);
+  overlay.classList.add('open');
+}async function openDetail(id) {
+  const it = await api(`/issues/${id}?history=true`);
+  modal.innerHTML = '';
+  modal.appendChild(el('h2', {}, `#${it.id} — ${it.title}`));
+  modal.appendChild(el('div', {class:'muted', style:'margin-bottom:10px'},
+    `${it.issue_type} · ${it.affected_system} · reported by ${it.reporter}`));
+  modal.appendChild(el('div', {}, it.description));
+
+  const meta = el('div', {class:'row', style:'margin-top:14px'});
+  meta.appendChild(formField('Severity', el('div',{},[el('span',{class:'sev sev-'+it.severity},it.severity)])));
+  meta.appendChild(formField('Status', el('div',{},[el('span',{class:'status-pill st-'+it.status},it.status)])));
+  modal.appendChild(meta);
+
+  if (it.cve_id) {
+    modal.appendChild(el('div', {class:'muted', style:'margin-top:8px'}, `${it.cve_id} — CVSS ${it.cvss_score}`));
+  }
+
+  const transRow = el('div', {class:'transition-row'});
+  (TRANSITIONS[it.status] || []).forEach(next => {
+    const b = el('button', {class:'btn ghost'}, `→ ${next.replace('_',' ')}`);
+    b.addEventListener('click', async () => {
+      try {
+        await api(`/issues/${it.id}/status`, {method:'PATCH', body: JSON.stringify({status: next})});
+        closeModal(); loadRows(); loadCards();
+      } catch(e) { alert(e.body?.error || 'Failed to update status'); }
+    });
+    transRow.appendChild(b);
+  });
+  modal.appendChild(transRow);
+
+  const hist = el('div', {class:'history'}, [el('div',{class:'lbl',style:'color:var(--muted);font-size:11px;margin-bottom:6px'},'History')]);
+  (it.history || []).forEach(h => {
+    hist.appendChild(el('div', {class:'history-item'},
+      `${fmtDate(h.timestamp)} — ${h.from_status || '(created)'} → ${h.to_status}${h.note ? '  · ' + h.note : ''}`));
+  });
+  modal.appendChild(hist);
+
+  const actions = el('div', {class:'modal-actions'});
+  const del = el('button', {class:'btn danger'}, 'Delete');
+  del.addEventListener('click', async () => {
+    if (!confirm('Delete this issue permanently?')) return;
+    await api(`/issues/${it.id}`, {method:'DELETE'});
+    closeModal(); loadRows(); loadCards();
+  });
+  const edit = el('button', {class:'btn ghost'}, 'Edit');
+  edit.addEventListener('click', () => openForm(it));
+  const close = el('button', {class:'btn'}, 'Close');
+  close.addEventListener('click', closeModal);
+  actions.appendChild(del); actions.appendChild(edit); actions.appendChild(close);
+  modal.appendChild(actions);
+
   overlay.classList.add('open');
 }
 </script>
