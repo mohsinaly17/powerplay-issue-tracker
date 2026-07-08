@@ -152,7 +152,76 @@
 </div>
 
 <script>
-// JavaScript will be added in the next steps
+const API = window.location.origin + '/api';
+let STATE = { sort_by: 'date_reported', order: 'desc', page: 1, per_page: 50 };
+const ENUMS = {
+  issue_type: ["BUG","VULNERABILITY","FEATURE_REQUEST","INCIDENT"],
+  severity: ["LOW","MEDIUM","HIGH","CRITICAL"],
+  priority: ["P1","P2","P3","P4"],
+  status: ["OPEN","IN_PROGRESS","RESOLVED","CLOSED","WONT_FIX"],
+};
+const TRANSITIONS = {
+  OPEN: ["IN_PROGRESS","WONT_FIX","CLOSED"],
+  IN_PROGRESS: ["RESOLVED","OPEN","WONT_FIX"],
+  RESOLVED: ["CLOSED","IN_PROGRESS"],
+  CLOSED: ["OPEN"],
+  WONT_FIX: ["OPEN"],
+};
+
+// small helper to build HTML elements without writing raw HTML strings everywhere
+function el(tag, attrs={}, children=[]) {
+  const e = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs)) {
+    if (k === 'html') e.innerHTML = v; else e.setAttribute(k, v);
+  }
+  (Array.isArray(children)?children:[children]).forEach(c => {
+    if (c==null) return;
+    e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  });
+  return e;
+}
+
+function populateFilterSelect(id, options) {
+  const sel = document.getElementById(id);
+  options.forEach(o => sel.appendChild(el('option', {value:o}, o)));
+}
+populateFilterSelect('f-status', ENUMS.status);
+populateFilterSelect('f-severity', ENUMS.severity);
+populateFilterSelect('f-type', ENUMS.issue_type);
+
+// wrapper around fetch() that talks to our Flask API
+async function api(path, opts={}) {
+  const res = await fetch(API + path, {
+    headers: {'Content-Type': 'application/json'},
+    ...opts,
+  });
+  const body = await res.json().catch(()=>({}));
+  if (!res.ok) { const e = new Error('api_error'); e.body = body; e.status = res.status; throw e; }
+  return body;
+}
+
+async function loadCards() {
+  try {
+    const s = await api('/reports/summary');
+    const cards = document.getElementById('cards');
+    cards.innerHTML = '';
+    cards.appendChild(cardEl(s.total_issues, 'Total issues', ''));
+    cards.appendChild(cardEl(s.by_status.OPEN || 0, 'Open', ''));
+    cards.appendChild(cardEl(s.by_severity.CRITICAL || 0, 'Critical severity', 'crit'));
+    cards.appendChild(cardEl(s.open_vulnerabilities, 'Open vulnerabilities', 'vuln'));
+    document.getElementById('apiStatus').textContent = 'api connected';
+  } catch (e) {
+    document.getElementById('apiStatus').textContent = 'api unreachable';
+  }
+}
+function cardEl(num, label, cls) {
+  return el('div', {class:'card '+cls}, [
+    el('div', {class:'num'}, String(num)),
+    el('div', {class:'lbl'}, label),
+  ]);
+}
+
+loadCards();
 </script>
 </body>
 </html>
