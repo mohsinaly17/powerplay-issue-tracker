@@ -51,3 +51,33 @@ def create_issue():
     issue_id = db.create_issue(conn, data)
     row = db.get_issue(conn, issue_id)
     return jsonify(db.row_to_dict(row)), 201
+@api.get("/issues")
+def list_issues():
+    search = request.args.get("q")
+    filters = {f: request.args.get(f) for f in
+               ("status", "severity", "issue_type", "priority", "assignee", "reporter")}
+    sort_by = request.args.get("sort_by", "date_reported")
+    order = request.args.get("order", "desc")
+    try:
+        page = max(int(request.args.get("page", 1)), 1)
+        per_page = min(max(int(request.args.get("per_page", 20)), 1), 100)
+    except ValueError:
+        return jsonify({"error": "page and per_page must be integers"}), 400
+
+    conn = get_conn()
+    total, items = db.list_issues(conn, search=search, filters=filters,
+                                   sort_by=sort_by, order=order,
+                                   page=page, per_page=per_page)
+    return jsonify({"total": total, "page": page, "per_page": per_page, "items": items})
+
+
+@api.get("/issues/<int:issue_id>")
+def get_issue(issue_id):
+    conn = get_conn()
+    row = db.get_issue(conn, issue_id)
+    if not row:
+        return jsonify({"error": "Issue not found"}), 404
+    history = None
+    if request.args.get("history", "false").lower() == "true":
+        history = db.get_history(conn, issue_id)
+    return jsonify(db.row_to_dict(row, history=history))
