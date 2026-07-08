@@ -222,6 +222,69 @@ function cardEl(num, label, cls) {
 }
 
 loadCards();
+function buildQuery() {
+  const params = new URLSearchParams();
+  const q = document.getElementById('q').value.trim();
+  if (q) params.set('q', q);
+  const status = document.getElementById('f-status').value;
+  const severity = document.getElementById('f-severity').value;
+  const type = document.getElementById('f-type').value;
+  if (status) params.set('status', status);
+  if (severity) params.set('severity', severity);
+  if (type) params.set('issue_type', type);
+  params.set('sort_by', STATE.sort_by);
+  params.set('order', STATE.order);
+  params.set('per_page', STATE.per_page);
+  return params.toString();
+}
+
+async function loadRows() {
+  const body = await api('/issues?' + buildQuery());
+  const tbody = document.getElementById('rows');
+  tbody.innerHTML = '';
+  document.getElementById('emptyMsg').style.display = body.items.length ? 'none' : 'block';
+  body.items.forEach(it => tbody.appendChild(rowEl(it)));
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toISOString().slice(0,10);
+}
+
+function rowEl(it) {
+  const tr = el('tr', {});
+  tr.appendChild(el('td', {}, [
+    el('div', {}, it.title),
+    it.cve_id ? el('div', {class:'cve'}, it.cve_id) : el('span',{class:'muted'},''),
+  ]));
+  tr.appendChild(el('td', {}, el('span',{class:'tag'}, it.issue_type)));
+  tr.appendChild(el('td', {}, el('span',{class:'sev sev-'+it.severity}, it.severity)));
+  tr.appendChild(el('td', {}, el('span',{class:'tag'}, it.priority)));
+  tr.appendChild(el('td', {}, el('span',{class:'status-pill st-'+it.status}, it.status.replace('_',' '))));
+  tr.appendChild(el('td', {}, it.assignee || el('span',{class:'muted'},'unassigned')));
+  tr.appendChild(el('td', {}, el('span',{class:'muted'}, fmtDate(it.date_reported))));
+  return tr;
+}
+
+document.querySelectorAll('th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const field = th.dataset.sort;
+    if (STATE.sort_by === field) STATE.order = STATE.order === 'asc' ? 'desc' : 'asc';
+    else { STATE.sort_by = field; STATE.order = 'desc'; }
+    loadRows();
+  });
+});
+
+let searchTimer;
+document.getElementById('q').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(loadRows, 250);
+});
+['f-status','f-severity','f-type'].forEach(id =>
+  document.getElementById(id).addEventListener('change', loadRows));
+
+loadRows();
 </script>
 </body>
 </html>
