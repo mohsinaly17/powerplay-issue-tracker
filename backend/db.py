@@ -5,13 +5,11 @@ from datetime import datetime, timezone
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tracker.db")
 
-# Allowed values for each enum-like field
 ISSUE_TYPES = ("BUG", "VULNERABILITY", "FEATURE_REQUEST", "INCIDENT")
 SEVERITIES = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
 STATUSES = ("OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED", "WONT_FIX")
 PRIORITIES = ("P1", "P2", "P3", "P4")
 
-# Which status can move to which (integrity rule)
 ALLOWED_TRANSITIONS = {
     "OPEN": {"IN_PROGRESS", "WONT_FIX", "CLOSED"},
     "IN_PROGRESS": {"RESOLVED", "OPEN", "WONT_FIX"},
@@ -20,7 +18,6 @@ ALLOWED_TRANSITIONS = {
     "WONT_FIX": {"OPEN"},
 }
 
-# Used so we can sort severity/priority logically (CRITICAL > HIGH), not alphabetically
 SEVERITY_RANK = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
 PRIORITY_RANK = {"P4": 0, "P3": 1, "P2": 2, "P1": 3}
 
@@ -29,16 +26,16 @@ SORTABLE_COLUMNS = {"date_reported", "date_updated", "title", "status"}
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
+
+
 def get_db(path=None):
-    """Open a connection to the SQLite database file."""
     conn = sqlite3.connect(path or DB_PATH)
-    conn.row_factory = sqlite3.Row  # lets us access columns by name, like a dict
+    conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
 def init_db(path=None):
-    """Create the tables if they don't already exist."""
     conn = get_db(path)
     conn.executescript("""
     CREATE TABLE IF NOT EXISTS issues (
@@ -79,15 +76,14 @@ def init_db(path=None):
 
 
 def row_to_dict(row, history=None):
-    """Convert a database row into a plain dictionary (for JSON output)."""
     d = dict(row)
     d["tags"] = d["tags"].split(",") if d.get("tags") else []
     if history is not None:
         d["history"] = history
     return d
-# ------------------------------------------------------------------ CRUD ---
+
+
 def create_issue(conn, data):
-    """Insert a new issue and record its creation in the history table."""
     ts = now_iso()
     cur = conn.execute("""
         INSERT INTO issues (title, description, issue_type, severity, priority,
@@ -108,13 +104,11 @@ def create_issue(conn, data):
 
 
 def get_issue(conn, issue_id):
-    """Fetch a single issue by its id."""
     row = conn.execute("SELECT * FROM issues WHERE id = ?", (issue_id,)).fetchone()
     return row
 
 
 def get_history(conn, issue_id):
-    """Fetch the full audit trail for one issue, oldest first."""
     rows = conn.execute(
         "SELECT * FROM issue_history WHERE issue_id = ? ORDER BY timestamp ASC",
         (issue_id,)
@@ -123,7 +117,6 @@ def get_history(conn, issue_id):
 
 
 def add_history(conn, issue_id, from_status, to_status, note):
-    """Append one row to the audit trail (never overwrites past history)."""
     conn.execute("""
         INSERT INTO issue_history (issue_id, from_status, to_status, note, timestamp)
         VALUES (?, ?, ?, ?, ?)
@@ -131,7 +124,6 @@ def add_history(conn, issue_id, from_status, to_status, note):
 
 
 def cve_exists(conn, cve_id, exclude_id=None):
-    """Check whether a CVE ID is already used by another issue (integrity check)."""
     if exclude_id:
         row = conn.execute(
             "SELECT id FROM issues WHERE cve_id = ? AND id != ?", (cve_id, exclude_id)
@@ -139,10 +131,9 @@ def cve_exists(conn, cve_id, exclude_id=None):
     else:
         row = conn.execute("SELECT id FROM issues WHERE cve_id = ?", (cve_id,)).fetchone()
     return row is not None
+
+
 def update_issue_fields(conn, issue_id, data):
-    """Update whichever fields are present in `data` (partial update allowed).
-    Note: status is NOT updated here - see update_status() below, which
-    keeps the audit trail consistent."""
     fields, values = [], []
     for col in ("title", "description", "issue_type", "severity", "priority",
                 "cve_id", "cvss_score", "affected_system", "reporter", "assignee"):
@@ -162,7 +153,6 @@ def update_issue_fields(conn, issue_id, data):
 
 
 def update_status(conn, issue_id, new_status, note):
-    """Change an issue's status. If moving to RESOLVED, stamp date_resolved."""
     resolved = now_iso() if new_status == "RESOLVED" else None
     conn.execute("""
         UPDATE issues SET status = ?, date_updated = ?, date_resolved = ?
@@ -172,24 +162,20 @@ def update_status(conn, issue_id, new_status, note):
 
 
 def delete_issue(conn, issue_id):
-    """Permanently remove an issue (its history rows are removed automatically
-    via the ON DELETE CASCADE foreign key)."""
     conn.execute("DELETE FROM issues WHERE id = ?", (issue_id,))
     conn.commit()
-    def list_issues(conn, search=None, filters=None, sort_by="date_reported",
-                 order="desc", page=1, per_page=20):
-    """List issues with optional keyword search, field filters, sorting and
-    pagination - all in one function."""
+
+
+def list_issues(conn, search=None, filters=None, sort_by="date_reported",
+                order="desc", page=1, per_page=20):
     filters = filters or {}
     clauses, params = [], []
 
-    # --- search across multiple text fields ---
     if search:
         like = f"%{search}%"
         clauses.append("(title LIKE ? OR description LIKE ? OR affected_system LIKE ? OR cve_id LIKE ?)")
         params += [like, like, like, like]
 
-    # --- exact-match filters ---
     for field in ("status", "severity", "issue_type", "priority", "assignee", "reporter"):
         if filters.get(field):
             clauses.append(f"{field} = ?")
@@ -200,17 +186,13 @@ def delete_issue(conn, issue_id):
     rows = conn.execute(f"SELECT * FROM issues {where}", params).fetchall()
     items = [dict(r) for r in rows]
 
-    # --- sorting ---
     if sort_by in ("severity", "priority"):
-        # severity/priority need a *logical* order (CRITICAL > HIGH > ...),
-        # not alphabetical, so we sort in Python using the rank tables
         rank = SEVERITY_RANK if sort_by == "severity" else PRIORITY_RANK
         items.sort(key=lambda i: rank.get(i[sort_by], -1), reverse=(order != "asc"))
     else:
         col = sort_by if sort_by in SORTABLE_COLUMNS else "date_reported"
         items.sort(key=lambda i: (i[col] is None, i[col]), reverse=(order != "asc"))
 
-    # --- pagination ---
     total = len(items)
     start = (page - 1) * per_page
     page_items = items[start:start + per_page]
