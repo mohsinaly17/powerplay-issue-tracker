@@ -285,6 +285,91 @@ document.getElementById('q').addEventListener('input', () => {
   document.getElementById(id).addEventListener('change', loadRows));
 
 loadRows();
+const overlay = document.getElementById('overlay');
+const modal = document.getElementById('modal');
+function closeModal(){ overlay.classList.remove('open'); modal.innerHTML=''; }
+overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+document.getElementById('newBtn').addEventListener('click', () => openForm(null));
+
+function formField(label, inputEl) {
+  return el('div', {class:'field'}, [el('label',{}, label), inputEl]);
+}
+function selectFor(name, value) {
+  const s = el('select', {id:'in-'+name});
+  ENUMS[name].forEach(o => {
+    const opt = el('option', {value:o}, o);
+    if (o === value) opt.setAttribute('selected','selected');
+    s.appendChild(opt);
+  });
+  return s;
+}
+
+function openForm(existing) {
+  modal.innerHTML = '';
+  const isEdit = !!existing;
+  modal.appendChild(el('h2', {}, isEdit ? `Edit issue #${existing.id}` : 'New issue'));
+
+  const title = el('input', {id:'in-title', value: existing?.title || ''});
+  const desc = el('textarea', {id:'in-description'}, existing?.description || '');
+  const type = selectFor('issue_type', existing?.issue_type || 'BUG');
+  const sev = selectFor('severity', existing?.severity || 'MEDIUM');
+  const pri = selectFor('priority', existing?.priority || 'P3');
+  const sys = el('input', {id:'in-affected_system', value: existing?.affected_system || ''});
+  const rep = el('input', {id:'in-reporter', value: existing?.reporter || ''});
+  const assignee = el('input', {id:'in-assignee', value: existing?.assignee || ''});
+  const cve = el('input', {id:'in-cve_id', value: existing?.cve_id || '', placeholder:'CVE-2026-12345'});
+  const cvss = el('input', {id:'in-cvss_score', value: existing?.cvss_score ?? '', placeholder:'0.0 - 10.0'});
+  const tags = el('input', {id:'in-tags', value: (existing?.tags||[]).join(', '), placeholder:'comma, separated, tags'});
+
+  const row1 = el('div', {class:'row'}, [formField('Title', title), formField('Affected system', sys)]);
+  const row2 = el('div', {class:'row'}, [formField('Type', type), formField('Severity', sev)]);
+  const row3 = el('div', {class:'row'}, [formField('Priority', pri), formField('Reporter', rep)]);
+  const row4 = el('div', {class:'row'}, [formField('Assignee', assignee), formField('Tags', tags)]);
+  const row5 = el('div', {class:'row'}, [formField('CVE ID (vulnerabilities only)', cve), formField('CVSS score (0-10, vulnerabilities only)', cvss)]);
+  const row6 = el('div', {class:'row'}, [el('div',{class:'field full'},[el('label',{},'Description'), desc])]);
+
+  const errBox = el('div', {class:'err'});
+  const actions = el('div', {class:'modal-actions'});
+  const cancel = el('button', {class:'btn ghost'}, 'Cancel');
+  cancel.addEventListener('click', closeModal);
+  const save = el('button', {class:'btn'}, isEdit ? 'Save changes' : 'Create issue');
+  save.addEventListener('click', async () => {
+    errBox.textContent = '';
+    const payload = {
+      title: title.value.trim(),
+      description: desc.value.trim(),
+      issue_type: type.value,
+      severity: sev.value,
+      priority: pri.value,
+      affected_system: sys.value.trim(),
+      reporter: rep.value.trim(),
+      assignee: assignee.value.trim() || null,
+      cve_id: cve.value.trim() || null,
+      cvss_score: cvss.value.trim() === '' ? null : parseFloat(cvss.value),
+      tags: tags.value.split(',').map(t=>t.trim()).filter(Boolean),
+    };
+    try {
+      if (isEdit) {
+        await api(`/issues/${existing.id}`, {method:'PUT', body: JSON.stringify(payload)});
+      } else {
+        await api('/issues', {method:'POST', body: JSON.stringify(payload)});
+      }
+      closeModal();
+      loadRows(); loadCards();
+    } catch (e) {
+      errBox.textContent = JSON.stringify(e.body?.errors || e.body?.error || e.body, null, 2);
+    }
+  });
+  actions.appendChild(cancel); actions.appendChild(save);
+
+  modal.appendChild(row1); modal.appendChild(row6);
+  modal.appendChild(row2); modal.appendChild(row3);
+  modal.appendChild(row4); modal.appendChild(row5);
+  modal.appendChild(errBox);
+  modal.appendChild(actions);
+  overlay.classList.add('open');
+}
 </script>
 </body>
 </html>
