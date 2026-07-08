@@ -40,3 +40,54 @@ See `docs/requirements.md` for the full requirements and data model outline.
 - `frontend/index.html` — Single-page vanilla JS/HTML/CSS dashboard
 - `docs/requirements.md` — Requirements & data model outline
 - `README.md` — this file
+## 3. API reference
+
+Base URL: `http://127.0.0.1:5000/api`
+
+| Method | Path | Description |
+|---|---|---|
+| GET | /health | liveness check |
+| GET | /issues?q=&status=&severity=&issue_type=&priority=&assignee=&reporter=&sort_by=&order=&page=&per_page= | search/filter/sort/paginate |
+| POST | /issues | create |
+| GET | /issues/<id>?history=true | read one (optionally with audit history) |
+| PUT | /issues/<id> | update (partial allowed; status excluded) |
+| PATCH | /issues/<id>/status | controlled status transition |
+| DELETE | /issues/<id> | delete |
+| GET | /reports/summary | counts by status/severity/type, open-vuln count |
+| GET | /reports/aging?days=7 | open items older than N days |
+## 4. Setup and running
+
+Steps:
+1. Open a terminal inside the backend folder
+2. Run: pip install flask
+3. Run: python app.py
+4. Open http://127.0.0.1:5000/ in a browser
+
+Running the tests:
+1. Open a terminal inside the backend folder
+2. Run: python -m unittest discover -s tests -v
+
+23 out of 23 tests currently pass, covering create/read/update/delete,
+validation errors, status-transition legality and audit history, search,
+filter, sort, pagination, and both report endpoints.
+## 5. Code attribution summary
+
+Every commit in this repository is self-attributed (self: prefix in the
+commit message) unless noted otherwise below. All code was written from
+scratch for this assignment, incrementally, with each logical piece of
+functionality committed and pushed separately as it was completed.
+
+| Item | Source | Licence / attribution |
+|---|---|---|
+| Flask (pip install flask) | Third-party PyPI package, used only via its public API | BSD-3-Clause |
+| Python standard library (sqlite3, re, unittest, datetime) | CPython standard library | PSF License |
+| Database schema, validation rules, REST endpoint design, status-transition state machine, audit-trail design | Written from scratch by the author | self |
+| Frontend HTML/CSS/JS (frontend/index.html) | Written from scratch by the author | self |
+| Sample/seed data (PowerPlay Sports Systems scenario and sample issues) | Fictional company and fictional sample issues invented by the author | self |
+| AI assistance | An AI coding assistant (Claude) was used interactively to help design and write the code, explain each part, and guide incremental, tested, git-committed development | disclosed |
+
+AI assistance disclosure: development of this project was carried out with
+the assistance of an AI coding assistant, which explained each piece of
+code, helped debug errors, and guided an incremental commit-by-commit
+development process. All code was reviewed, typed in, run, and tested by
+the author at each step.
