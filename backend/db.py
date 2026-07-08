@@ -85,3 +85,57 @@ def row_to_dict(row, history=None):
     if history is not None:
         d["history"] = history
     return d
+# ------------------------------------------------------------------ CRUD ---
+def create_issue(conn, data):
+    """Insert a new issue and record its creation in the history table."""
+    ts = now_iso()
+    cur = conn.execute("""
+        INSERT INTO issues (title, description, issue_type, severity, priority,
+                             status, cve_id, cvss_score, affected_system, reporter,
+                             assignee, tags, date_reported, date_updated, date_resolved)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        data["title"], data["description"], data["issue_type"], data["severity"],
+        data.get("priority", "P3"), data.get("status", "OPEN"), data.get("cve_id"),
+        data.get("cvss_score"), data["affected_system"], data["reporter"],
+        data.get("assignee"), ",".join(data.get("tags", []) or []),
+        ts, ts, None,
+    ))
+    issue_id = cur.lastrowid
+    add_history(conn, issue_id, None, data.get("status", "OPEN"), "Issue created")
+    conn.commit()
+    return issue_id
+
+
+def get_issue(conn, issue_id):
+    """Fetch a single issue by its id."""
+    row = conn.execute("SELECT * FROM issues WHERE id = ?", (issue_id,)).fetchone()
+    return row
+
+
+def get_history(conn, issue_id):
+    """Fetch the full audit trail for one issue, oldest first."""
+    rows = conn.execute(
+        "SELECT * FROM issue_history WHERE issue_id = ? ORDER BY timestamp ASC",
+        (issue_id,)
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def add_history(conn, issue_id, from_status, to_status, note):
+    """Append one row to the audit trail (never overwrites past history)."""
+    conn.execute("""
+        INSERT INTO issue_history (issue_id, from_status, to_status, note, timestamp)
+        VALUES (?, ?, ?, ?, ?)
+    """, (issue_id, from_status, to_status, note, now_iso()))
+
+
+def cve_exists(conn, cve_id, exclude_id=None):
+    """Check whether a CVE ID is already used by another issue (integrity check)."""
+    if exclude_id:
+        row = conn.execute(
+            "SELECT id FROM issues WHERE cve_id = ? AND id != ?", (cve_id, exclude_id)
+        ).fetchone()
+    else:
+        row = conn.execute("SELECT id FROM issues WHERE cve_id = ?", (cve_id,)).fetchone()
+    return row is not None
