@@ -34,7 +34,6 @@ def get_db(path=None):
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
-
 def init_db(path=None):
     conn = get_db(path)
     conn.executescript("""
@@ -199,3 +198,35 @@ def list_issues(conn, search=None, filters=None, sort_by="date_reported",
     for it in page_items:
         it["tags"] = it["tags"].split(",") if it.get("tags") else []
     return total, page_items
+def report_summary(conn):
+    """Count issues by status/severity/type, and count open vulnerabilities."""
+    rows = conn.execute("SELECT status, severity, issue_type FROM issues").fetchall()
+    by_status, by_severity, by_type = {}, {}, {}
+    open_vulns = 0
+    for r in rows:
+        by_status[r["status"]] = by_status.get(r["status"], 0) + 1
+        by_severity[r["severity"]] = by_severity.get(r["severity"], 0) + 1
+        by_type[r["issue_type"]] = by_type.get(r["issue_type"], 0) + 1
+        if r["issue_type"] == "VULNERABILITY" and r["status"] not in ("RESOLVED", "CLOSED", "WONT_FIX"):
+            open_vulns += 1
+    return {
+        "total_issues": len(rows),
+        "by_status": by_status,
+        "by_severity": by_severity,
+        "by_type": by_type,
+        "open_vulnerabilities": open_vulns,
+    }
+
+
+def report_aging(conn, days=7):
+    """Find open issues that were reported more than `days` days ago -
+    these are the ones that have been sitting around too long."""
+    from datetime import timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    rows = conn.execute("""
+        SELECT * FROM issues
+        WHERE status NOT IN ('RESOLVED', 'CLOSED', 'WONT_FIX') AND date_reported <= ?
+        ORDER BY date_reported ASC
+    """, (cutoff,)).fetchall()
+    items = [row_to_dict(r) for r in rows]
+    return items
