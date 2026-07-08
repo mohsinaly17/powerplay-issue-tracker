@@ -132,3 +132,28 @@ def update_status(issue_id):
     conn.commit()
     updated = db.get_issue(conn, issue_id)
     return jsonify(db.row_to_dict(updated))
+@api.delete("/issues/<int:issue_id>")
+def delete_issue(issue_id):
+    conn = get_conn()
+    row = db.get_issue(conn, issue_id)
+    if not row:
+        return jsonify({"error": "Issue not found"}), 404
+    db.delete_issue(conn, issue_id)
+    return jsonify({"deleted": issue_id}), 200
+
+
+@api.get("/reports/summary")
+def report_summary():
+    conn = get_conn()
+    return jsonify(db.report_summary(conn))
+
+
+@api.get("/reports/aging")
+def report_aging():
+    try:
+        days = int(request.args.get("days", 7))
+    except ValueError:
+        return jsonify({"error": "days must be an integer"}), 400
+    conn = get_conn()
+    items = db.report_aging(conn, days=days)
+    return jsonify({"cutoff_days": days, "count": len(items), "items": items})
