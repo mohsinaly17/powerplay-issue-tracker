@@ -139,3 +139,40 @@ def cve_exists(conn, cve_id, exclude_id=None):
     else:
         row = conn.execute("SELECT id FROM issues WHERE cve_id = ?", (cve_id,)).fetchone()
     return row is not None
+def update_issue_fields(conn, issue_id, data):
+    """Update whichever fields are present in `data` (partial update allowed).
+    Note: status is NOT updated here - see update_status() below, which
+    keeps the audit trail consistent."""
+    fields, values = [], []
+    for col in ("title", "description", "issue_type", "severity", "priority",
+                "cve_id", "cvss_score", "affected_system", "reporter", "assignee"):
+        if col in data:
+            fields.append(f"{col} = ?")
+            values.append(data[col])
+    if "tags" in data:
+        fields.append("tags = ?")
+        values.append(",".join(data["tags"] or []))
+    if not fields:
+        return
+    fields.append("date_updated = ?")
+    values.append(now_iso())
+    values.append(issue_id)
+    conn.execute(f"UPDATE issues SET {', '.join(fields)} WHERE id = ?", values)
+    conn.commit()
+
+
+def update_status(conn, issue_id, new_status, note):
+    """Change an issue's status. If moving to RESOLVED, stamp date_resolved."""
+    resolved = now_iso() if new_status == "RESOLVED" else None
+    conn.execute("""
+        UPDATE issues SET status = ?, date_updated = ?, date_resolved = ?
+        WHERE id = ?
+    """, (new_status, now_iso(), resolved, issue_id))
+    conn.commit()
+
+
+def delete_issue(conn, issue_id):
+    """Permanently remove an issue (its history rows are removed automatically
+    via the ON DELETE CASCADE foreign key)."""
+    conn.execute("DELETE FROM issues WHERE id = ?", (issue_id,))
+    conn.commit()
