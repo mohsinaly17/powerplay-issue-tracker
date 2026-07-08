@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PowerPlay Sports Systems — Issue & Vulnerability Tracker</title>
+<style>
+  :root{
+    --bg:#0b1220;
+    --panel:#111a2b;
+    --panel-hi:#16213a;
+    --line:#233052;
+    --text:#e7ecf7;
+    --muted:#8b97b4;
+    --accent:#3ddc97;
+    --amber:#e8a33d;
+    --red:#e85d5d;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);}
+  header{
+    padding:22px 28px;border-bottom:1px solid var(--line);
+    display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:10px;
+  }
+  .brand{display:flex;align-items:baseline;gap:12px}
+  .brand .mark{
+    width:10px;height:10px;border-radius:2px;background:var(--accent);
+    box-shadow:0 0 12px var(--accent);
+  }
+  h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:12.5px;font-family:var(--mono)}
+  main{max-width:1180px;margin:0 auto;padding:22px 28px 60px}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+  .card .num{font-family:var(--mono);font-size:24px;font-weight:700}
+  .card .lbl{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;margin-top:2px}
+  .card.crit .num{color:var(--red)}
+  .card.vuln .num{color:var(--amber)}
+
+  .toolbar{
+    display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px;
+  }
+  input,select,button,textarea{
+    font-family:var(--sans);font-size:13px;background:var(--panel-hi);
+    color:var(--text);border:1px solid var(--line);border-radius:6px;padding:8px 10px;
+  }
+  input:focus,select:focus,textarea:focus{outline:1px solid var(--accent)}
+  #q{flex:1;min-width:180px}
+  .btn{cursor:pointer;background:var(--accent);color:#052018;font-weight:600;border:none}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .btn.danger{background:var(--red);color:#2a0a0a}
+  .spacer{flex:1}
+
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  thead th{
+    text-align:left;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;
+    padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none;
+  }
+  thead th:hover{color:var(--text)}
+  tbody td{padding:11px 12px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--panel-hi);cursor:pointer}
+  .tag{
+    display:inline-block;font-family:var(--mono);font-size:10.5px;padding:2px 6px;border-radius:4px;
+    border:1px solid var(--line);color:var(--muted);
+  }
+  .sev{font-weight:700;font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:4px}
+  .sev-LOW{color:#7fb3ff;background:#122043}
+  .sev-MEDIUM{color:var(--amber);background:#3a2a0f}
+  .sev-HIGH{color:#ff9a5c;background:#3a200f}
+  .sev-CRITICAL{color:var(--red);background:#3a1414}
+  .status-pill{font-size:11px;font-family:var(--mono);padding:2px 8px;border-radius:12px;border:1px solid var(--line)}
+  .st-OPEN{color:var(--red)}
+  .st-IN_PROGRESS{color:var(--amber)}
+  .st-RESOLVED,.st-CLOSED{color:var(--accent)}
+  .st-WONT_FIX{color:var(--muted)}
+  .cve{font-family:var(--mono);font-size:11.5px;color:#7fb3ff}
+  .muted{color:var(--muted)}
+  .empty{padding:40px;text-align:center;color:var(--muted)}
+
+  .overlay{
+    display:none;position:fixed;inset:0;background:rgba(4,8,16,.72);
+    align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:20;
+  }
+  .overlay.open{display:flex}
+  .modal{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    width:100%;max-width:640px;padding:22px;
+  }
+  .modal h2{margin:0 0 14px;font-size:16px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .field.full{grid-column:1 / -1}
+  textarea{min-height:70px;resize:vertical;font-family:var(--sans)}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+  .err{color:var(--red);font-size:12px;margin-top:8px;white-space:pre-wrap}
+  .history{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+  .history-item{font-size:12px;font-family:var(--mono);color:var(--muted);margin-bottom:4px}
+  .transition-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .transition-row button{font-size:11.5px;padding:6px 10px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="mark"></span>
+    <div>
+      <h1>PowerPlay Sports Systems</h1>
+      <div class="sub">issue &amp; vulnerability tracking system</div>
+    </div>
+  </div>
+  <div class="sub" id="apiStatus">connecting to api…</div>
+</header>
+
+<main>
+  <div class="cards" id="cards"></div>
+
+  <div class="toolbar">
+    <input id="q" placeholder="Search title, description, system, CVE…" />
+    <select id="f-status"><option value="">Status: all</option></select>
+    <select id="f-severity"><option value="">Severity: all</option></select>
+    <select id="f-type"><option value="">Type: all</option></select>
+    <div class="spacer"></div>
+    <button class="btn" id="newBtn">+ New issue</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th data-sort="title">Title</th>
+        <th data-sort="issue_type">Type</th>
+        <th data-sort="severity">Severity</th>
+        <th data-sort="priority">Priority</th>
+        <th data-sort="status">Status</th>
+        <th>Assignee</th>
+        <th data-sort="date_reported">Reported</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="empty" id="emptyMsg" style="display:none">No issues match the current filters.</div>
+</main>
+
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+// JavaScript will be added in the next steps
+</script>
+</body>
+</html>
