@@ -29,3 +29,14 @@ See `docs/requirements.md` for the full requirements and data model outline.
 ---
 
 ## 2. Architecture
+
+**Folder structure:**
+
+- `backend/app.py` — Flask app + seed data + entrypoint
+- `backend/db.py` — Data-access layer (sqlite3, parameterised queries)
+- `backend/validation.py` — Request validation
+- `backend/routes.py` — REST API endpoints (CRUD, search/sort/filter, reports)
+- `backend/tests/test_api.py` — 23 automated tests (unittest)
+- `frontend/index.html` — Single-page vanilla JS/HTML/CSS dashboard
+- `docs/requirements.md` — Requirements & data model outline
+- `README.md` — this file
