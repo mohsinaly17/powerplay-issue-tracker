@@ -67,9 +67,9 @@ Running the tests:
 1. Open a terminal inside the backend folder
 2. Run: python -m unittest discover -s tests -v
 
-23 out of 23 tests currently pass, covering create/read/update/delete,
-validation errors, status-transition legality and audit history, search,
-filter, sort, pagination, and both report endpoints.
+18 out of 18 tests currently pass, covering create/read/update/delete,
+validation errors, status-transition legality, search, filter, sort,
+pagination, and both report endpoints.
 ## 5. Code attribution summary
 
 Every commit in this repository is self-attributed (self: prefix in the
