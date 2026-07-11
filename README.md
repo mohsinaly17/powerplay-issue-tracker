@@ -36,7 +36,7 @@ See `docs/requirements.md` for the full requirements and data model outline.
 - `backend/db.py` — Data-access layer (sqlite3, parameterised queries)
 - `backend/validation.py` — Request validation
 - `backend/routes.py` — REST API endpoints (CRUD, search/sort/filter, reports)
-- `backend/tests/test_api.py` — 23 automated tests (unittest)
+- `backend/tests/test_api.py` — 18 automated tests (unittest)
 - `frontend/index.html` — Single-page vanilla JS/HTML/CSS dashboard
 - `docs/requirements.md` — Requirements & data model outline
 - `README.md` — this file
@@ -46,15 +46,15 @@ Base URL: `http://127.0.0.1:5000/api`
 
 | Method | Path | Description |
 |---|---|---|
-| GET | /health | liveness check |
-| GET | /issues?q=&status=&severity=&issue_type=&priority=&assignee=&reporter=&sort_by=&order=&page=&per_page= | search/filter/sort/paginate |
-| POST | /issues | create |
-| GET | /issues/<id>?history=true | read one (optionally with audit history) |
-| PUT | /issues/<id> | update (partial allowed; status excluded) |
-| PATCH | /issues/<id>/status | controlled status transition |
-| DELETE | /issues/<id> | delete |
-| GET | /reports/summary | counts by status/severity/type, open-vuln count |
-| GET | /reports/aging?days=7 | open items older than N days |
+| GET | `/health` | liveness check |
+| GET | `/issues` | search/filter/sort/paginate (query params: q, status, severity, issue_type, priority, assignee, reporter, sort_by, order, page, per_page) |
+| POST | `/issues` | create |
+| GET | `/issues/<id>` | read one (add ?history=true for audit history) |
+| PUT | `/issues/<id>` | update (partial allowed; status excluded) |
+| PATCH | `/issues/<id>/status` | controlled status transition |
+| DELETE | `/issues/<id>` | delete |
+| GET | `/reports/summary` | counts by status/severity/type, open-vuln count |
+| GET | `/reports/aging` | open items older than N days (query param: days) |
 ## 4. Setup and running
 
 Steps:
